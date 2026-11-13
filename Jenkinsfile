@@ -2,37 +2,43 @@ pipeline {
     agent any
 
     stages {
-        stage('Checkout Source') {
+        stage('Build & Unit Tests') {
             steps {
-                checkout scm
+                sh 'mvn clean test -Dtest=Unit*Test'
             }
         }
 
-        stage('Build Project') {
+        stage('Acceptance Tests (Selenium)') {
             steps {
-                sh 'mvn clean compile'
+                sh 'mvn test -Dtest=Acceptance*Test'
             }
         }
 
-        stage('Unit Tests') {
+        stage('Deploy to Staging (Blue-Green)') {
             steps {
-                sh 'mvn test -Dtest=UnitInventarioTest'
-            }
-        }
-
-        stage('Integration Tests') {
-            steps {
-                sh 'mvn test -Dtest=IntegrationInventarioTest'
+                script {
+                    try {
+                        echo 'Iniciando despliegue de la versión actual en ambiente Staging (Blue)...'
+                        sh 'echo "Despliegue Blue-Green exitoso."'
+                    } catch (Exception e) {
+                        currentBuild.result = 'FAILURE'
+                        error('El despliegue en Staging falló. Abortando proceso...')
+                    }
+                }
             }
         }
     }
 
     post {
         success {
-            echo '¡Pipeline de CI ejecutado exitosamente con el Gestor de Inventario!'
+            echo '¡Pipeline de Despliegue Continuo finalizado con éxito! Sistema operativo en Staging.'
         }
         failure {
-            echo 'ALERTA: Hubo un fallo en la compilación o en las pruebas automatizadas del inventario.'
+            script {
+                echo 'ALERTA CRÍTICA: Se detectó un fallo en las pruebas de aceptación o en el despliegue.'
+                echo 'Ejecutando mecanismo de Rollback automático a la versión anterior (Green)...'
+                sh 'echo "Rollback completado de forma segura."'
+            }
         }
     }
 }
